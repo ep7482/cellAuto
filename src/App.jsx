@@ -1,5 +1,6 @@
 import React from 'react'
 import { useState, useEffect } from 'react'
+import Grid from './components/Grid'
 import './App.css'
 
 // const createGrid = (rows, cols, half) => {
@@ -41,9 +42,9 @@ import './App.css'
 //   return grid
 // }
 
-const createGrid = () => {
+const createGrid = (rows, cols) => {
   // Start with an empty grid
-  let grid = Array.from({ length: 80 }, () => Array.from({ length: 80 }, () => 0));
+  let grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => 0));
 
   // Define the glider and small exploder patterns
   const glider = [
@@ -68,9 +69,9 @@ const createGrid = () => {
   // }
 
   // Randomize some cells
-  for (let i = 0; i < 1000; i++) {
-    const x = Math.floor(Math.random() * 80);
-    const y = Math.floor(Math.random() * 80);
+  for (let i = 0; i < rows*cols; i++) {
+    const x = Math.floor(Math.random() * rows);
+    const y = Math.floor(Math.random() * cols);
     grid[x][y] = 1;
   }
 
@@ -93,11 +94,6 @@ const neighbours = (grid, x, y) => {
       }
     })
   })
-  // if (grid[x][y]) {
-  //   console.log(grid[x][y], [x, y], neighbours)
-  //   console.log(neighbours.map(([x, y]) => grid[x][y]))
-  //   console.log(neighbours.map(([x, y]) => grid[x][y]).reduce((a, b) => a + b, 0))
-  // }
   return neighbours
 }
 
@@ -121,107 +117,140 @@ const rule1 = (prevGrid) => {
   return newGrid
 }
 
+const aliveCount = (grid, i, j) => {
+  const neighVals = neighbours(grid, i, j).map(([x, y]) => grid[x][y])
+  return neighVals.reduce((a, b) => a + b, 0)
+}
+
 const rule2 = (prevGrid) => {
-  let newGrid = JSON.parse(JSON.stringify(prevGrid));
+  let newGrid = prevGrid.map(row => [...row]);
 
   for (let i = 0; i < prevGrid.length; i++) {
     for (let j = 0; j < prevGrid[i].length; j++) {
-      const neighs = neighbours(prevGrid, i, j)
-      const neighVals = neighs.map(([x, y]) => prevGrid[x][y])
-      const aliveCount = neighVals.reduce((a, b) => a + b, 0)
+      const aliveCells = aliveCount(prevGrid, i, j)
       const state = prevGrid[i][j]
-
-      // console.log("****************************************")
-      // console.log(`Cell [${i}-${j}] Alive Count ${aliveCount} NeighVals ${neighVals}`)
-  
-      // const aliveCount = neighVals.map(bool => bool ? 1 : 0).reduce((a, b) => a + b, 0)
-      if (state === 0 && aliveCount === 3) {
+      if (state === 0 && aliveCells === 3) {
         newGrid[i][j] = 1
-        // console.log('born', [i, j], aliveCount)
-      } else if (state === 1 && (aliveCount < 2 || aliveCount > 3)) {
+      } else if (state === 1 && (aliveCells < 2 || aliveCells > 3)) {
         newGrid[i][j] = 0
-        // console.log('died', [i, j], aliveCount) 
       } else {
-        // console.log('lived', [i, j], aliveCount)s
         newGrid[i][j] = state
       }
-      // if (prevGrid[i][j] && deadCount === 3) {
-      //   newGrid[i][j] = false
-      // } else if (!prevGrid[i][j] && (deadCount < 2 || deadCount > 3)) {
-      //   newGrid[i][j] = true
-      // } else if (!prevGrid[i][j] && (deadCount === 2 || deadCount === 3))
-      // continue
     }
   }
 
   return newGrid
 }
 
+function arraysEqual(a, b) {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].length !== b[i].length) return false
+    for (let j = 0; j < a[i].length; j++) {
+      if (a[i][j] !== b[i][j]) return false
+    }
+  }
+  return true
+}
+
 const App = () => {
-  const [grid, setGrid] = useState(() => createGrid(100, 100, false))
-  const [highlighted, setHighlighted] = useState([])
+  
+  const [pixelSize, setPixelSizeState] = useState(2.5)
+  // const yNumCells = Math.floor(window.innerWidth / pixelSize)
+  // const xNumCells = Math.floor(window.innerHeight / pixelSize)
+  const [xNumCells, setXNumCells] = useState(Math.floor(window.innerHeight/ pixelSize))
+  const [yNumCells, setYNumCells] = useState(Math.floor(window.innerWidth / pixelSize))
+  const [grid, setGrid] = useState(() => createGrid(xNumCells, yNumCells, false))
+  console.log("GridSize: ", grid.length, grid[0].length)
   const [running, setRunning] = useState(false)
 
   useEffect(() => {
     let interval
     if (running) {
-      // const animationId = requestAnimationFrame(() => {
-      //   setGrid((prevGrid) => {
-      //     const newGrid = rule2(prevGrid)
-      //     return newGrid
-      //   })
-      // })
-      // return () => cancelAnimationFrame(animationId)
       interval = setInterval(() => {
-        setGrid((prevGrid) => {
-          return rule2(prevGrid)
-        })
+        const nextGrid = rule2(grid)
+        if (!arraysEqual(grid, nextGrid)) {
+          setGrid(nextGrid)
+        }
       }, 1)
     }
     return () => clearInterval(interval)
   }, [grid, running])
 
-  const handleClick = (x, y) => {
-    const neighbors = neighbours(grid, x, y)
-    setHighlighted(neighbors.map(([x, y]) => `${x},${y}`))
-    setTimeout(() => {
-      setHighlighted([])
-    }, 100)
-  }
+  
+  useEffect(() => {
+    const handleWheel = (event) => {
+      // const factor = event.deltaY > 0 ? 1.1 : 0.9
+      // const newPixelSize = pixelSize * factor;
+      // console.log(newPixelSize)
+      // setPixelSizeState(Math.min(Math.max(newPixelSize, 2.5)), 100)
+      // setNumCells((prevNumCells) => {
+      //   const factor = event.deltaY > 0 ? 1.1 : 0.9
+      //   const newNumCells = prevNumCells * factor;
+      //   console.log(newNumCells)
+      //   return Math.max(Math.floor(newNumCells), 10)
+      // });
+      setPixelSizeState((prevPixelSize) => {
+        const factor = event.deltaY > 0 ? 1.1 : 0.9
+        const newPixelSize = prevPixelSize * factor;
+        return Math.min(Math.max(newPixelSize, 2.5), 100)
+      })
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+
+    let newXNumCells = Math.floor(screenHeight / pixelSize);
+    let newYNumCells = Math.floor(screenWidth / pixelSize);
+
+    if (newXNumCells * pixelSize < screenHeight) {
+      newXNumCells = Math.ceil(screenHeight / pixelSize);
+    }
+    if (newYNumCells * pixelSize < screenWidth) {
+      newYNumCells = Math.ceil(screenWidth / pixelSize);
+    }
+  
+    setXNumCells(newXNumCells);
+    setYNumCells(newYNumCells);
+    setGrid(createGrid(newXNumCells,newYNumCells, false))
+  }, [pixelSize]);
+
+  // useEffect(() => {
+  //   setGrid(createGrid(xNumCells, yNumCells, false))
+  //   setRunning(false)
+  // }, [numCells]);
 
   const handleReset = () => {
-    setGrid(createGrid(100, 100, false))
+    setGrid(createGrid(xNumCells, yNumCells, false))
     setRunning(false)
   }
 
-  const pixelSize = 10
-
   return (
-    <>
-      <div style={{display: 'grid', gridTemplateColumns: `repeat(${grid[0].length}, ${pixelSize}px)`}}>
-        {grid.map((rows, i) =>
-          rows.map((col, k) =>
-            <div
-              key={`${i}-${k}`}
-              style={{
-                width: pixelSize,
-                height: pixelSize,
-                backgroundColor: grid[i][k] ? 'white' : 'black',
-                color: grid[i][k] ? 'black' : 'white',
-                border: `solid 1px ${!grid[i][k] ? 'black' : 'white'}`
-              }}
-              onClick={() => {
-                handleClick(i, k)
-              }}
-            >
-              {/* {`${i}-${k}`} */}
-            </div>
-          )
-        )}
+    <div >
+    {/* <div style={{display: 'flex',  width: '100vw'}}> */}
+
+      {/* <div style={{border: '1px solid red', display: 'flex', flex: 1, justifyContent:'center', alignItems: 'center', height: '100vh'}}> */}
+      <div>
+        <div>
+          <div id='screen' style={{border: '1px solid red'}}>
+            <Grid grid={grid} pixelSize={pixelSize}/>
+          </div>
+          <div id='control' style={{border: '1px solid red', display: 'flex', justifyContent: 'center'}}>
+            <button onClick={() => setRunning(!running)}>{running ? 'Stop' : 'Start'}</button>
+            <button onClick={() => handleReset()}>Reset</button>
+            {pixelSize}
+          </div>
+        </div>
       </div>
-    <button onClick={() => setRunning(!running)}>{running ? 'Stop' : 'Start'}</button>
-    <button onClick={() => handleReset()}>Reset</button>
-  </>
+    </div>
   )
 }
 
